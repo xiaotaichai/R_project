@@ -1,0 +1,59 @@
+---
+title: "Bootstrapping methods"
+author: "Xiaotai Chai"
+date: "2/28/2018"
+output: pdf_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(boot)
+```
+
+
+1. A statistics student was interested in prices for used Mustang cars being offered for sale on an internet site. He sampled 25 cars from the website; the data are stored in the data set “MustangPrice” in the Lock5Data package. 
+
+a.	Suppose we are interested in studying the correlation between Price and Miles for the cars. Describe how you might take one bootstrap sample from this data set. 
+```{r}
+#install.packages("Lock5Data")
+library(Lock5Data)
+attach(MustangPrice)
+
+sample_corr <- function(data, i){
+ sample = data[i,]
+  correlation = cor(sample$Price,sample$Miles)
+  return(correlation)
+}
+
+(result <- boot(MustangPrice, sample_corr, R=500 ))
+# I might take one bootstrap sample by taking n amount of sample by replacement.
+```
+
+b.	What is the bootstrap estimate of the standard error?
+```{r}
+(std_error <- sd(result$t))
+```
+
+c.	Find a 95% bootstrap confidence interval for the correlation. Interpret the interval in context.
+```{r}
+(CI_corr <- boot.ci(result))
+## Interpretation: We are confident that 95% of the correlation would fall between -0.9 and -0.7. There's a negative correlation between price and miles. When miles go up, price goes down.
+```
+
+d.	Suppose we would like to create a 95% bootstrap confidence interval for the median price of the mustangs. Simulate 1000 bootstrap samples and graph the bootstrap distribution for the sample median price. If appropriate, construct a 95% bootstrap CI for the median price; if not appropriate, explain why.
+```{r}
+sample_med <- function(data, i){
+ sample = data[i,]
+  med = median(sample$Price)
+  return(med)
+}
+
+(result2 <- boot(MustangPrice, sample_med, R=1000 ))
+plot(result2)
+(CI_med <- boot.ci(result2))
+## It's appropriate.
+```
+
+
+
+
