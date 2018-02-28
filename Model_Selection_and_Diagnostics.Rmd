@@ -1,0 +1,164 @@
+---
+title: "Model Selection and Diagnostics"
+author: "Xiaotai Chai"
+date: "2/28/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+set.seed(1)
+```
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+library(readxl)
+library('dplyr')
+library(lmtest)
+library(ISLR)
+library(MASS)
+library(boot)
+library(leaps)
+```
+
+# Model selection, real data
+
+Suppose a researcher is using the College data set in `ISLR` to predict the number of students enrolled in a college. 
+
+1. The researcher is interested in comparing the model with all predictors to a smaller model predicting enrollment using Private, Accept, Top10perc, F.Undergrad, and Room.Board. Is there statistical evidence to justify keeping the full model? Justify your answer.
+```{r}
+data('College')
+
+mod_full <- lm(Enroll ~ Private + Accept + Top10perc + F.Undergrad + Room.Board, data = College)
+full_summ <- summary(mod_full)
+
+allpossreg <- regsubsets(Enroll ~ Private + Accept + Top10perc + F.Undergrad + Room.Board, nbest = 6, data = College)
+
+aprout <- summary(allpossreg)
+
+with(aprout, round(cbind(which, rsq, adjr2, cp, bic), 4))  
+```
+**AWS: The adjusted R^2 for the full model is largest and BIC statistic for the full model is one of the smallest, so we should keep the full model.**
+
+2. Perform model selection using the method of your choice. State the equation for the model you choose, and briefly explain your criteria in choosing that model. 
+```{r}
+stepAIC(mod_full, direction = "backward")
+```
+The model is $Enroll = 127.66708 + 0.11388*Accept + 1.99818*Top10perc + 0.13301*F.Undergrad - 0.02864*Room.Board$.
+**Criteria: Consider the predictor with the lowest AIC -	If AIC is lower when the predictor has been removed than when it is in model, remove it; otherwise, keep it.**
+
+
+# Model diagnostics, simulated data
+
+Given the simulated data in the attached file...
+
+1. Examine the data for evidence of multicollinearity, nonlinearity in the predictors, influential outliers, heteroskedacity, and nonnormal errors. If you find evidence of a problem, adjust your model accordingly. If you find influential outliers, remove them from the data set (we will pretend that any outliers are actually typos). Briefly summarize your results (1-2 sentences) and give the coefficients for your final fitted model.
+
+## Read in data
+```{r}
+mydata <- read_excel("myData.xlsx")
+```
+
+## multicollinearity and nonlinearity in the predictors
+```{r}
+mydataF <- mydata
+names(mydataF) <- c("y", "x1", "x2", "x3")
+pairs(mydataF)
+cor(mydataF)
+# Check multicollinearity between x1 and x2
+mulcol12 <- lm(x1 ~ x2, data=mydata)
+summary(mulcol12)
+
+# Check multicollinearity between x1 and x3
+mulcol13 <- lm(x1 ~ x3, data=mydata)
+summary(mulcol13)
+
+# Check multicollinearity between x2 and x3
+mulcol23 <- lm(x2 ~ x3, data=mydata)
+summary(mulcol23)
+```
+**There's multicollinearity between x2 and x3 since the p value for the coefficient of x3 is strongly significant. There are nonlinearity between x1 and x2, x1 and x3. So I'll leave out x3 as a predictor.**
+
+
+## influential outliers
+```{r}
+fit <- lm(y ~ x1 +x2, data = mydata)
+
+## Find Y outliers
+diag_df <- data.frame(obs_id = 1:nrow(mydata), 
+resid = round(resid(fit), 4), 
+hatvalues = round(hatvalues(fit), 4), 
+delstudent = round(rstudent(fit), 4))
+
+n <- nrow(mydata)
+alpha <- 0.1
+p <- length(coef(fit))
+
+(t.crit <- qt(1 - alpha/(2 * n), n - p - 1))
+df <- mutate(diag_df, outlier = abs(delstudent) >= t.crit)
+filter(df, outlier == TRUE)
+
+## Find influential cases using Cook's Distance
+infl_df <- data.frame(dffits = round(dffits(fit), 4), 
+                      cooksd = round(cooks.distance(fit), 4), 
+                      dfbeta0 = round(dfbetas(fit)[, 1], 4), 
+                      dfbeta1 = round(dfbetas(fit)[, 2], 4), 
+                      dfbeta2 = round(dfbetas(fit)[, 3], 4))
+
+plot(fit, which = 4:5)
+```
+**The 47th and 186th observations are the Y outliers, but only 47th observation is outside the Cook's distance dash line, which means it is the influential case for the model. So I'll remove the 47th from the data set.**
+```{r}
+mydatanew <- mydata[-47,]
+fit2 <- lm(y ~ x1 +x2, data = mydatanew)
+```
+
+## heteroskedacity
+```{r}
+plot(fit2, which = 3)
+
+## Broeusch Pagan Test to check heteroskedacity
+bptest(y ~ x1+x2, data=mydatanew)
+
+``` 
+**In the Scale-Location plot, the residuals looks like a random cloud of points for all fitted values along the x-axis and there are no patterns or shapes. So there's no heteroskedacity Also, the test has a p-value greater than a significance level of 0.05, therefore we can accept the null hypothesis that the variance of the residuals is constant and infer that heteroskedacity is not present. **
+
+## nonnormal errors
+```{r}
+plot(fit2, which = 2)
+
+## Shapiro-Wilk normality test to test normality
+shapiro.test(residuals(fit2))
+```
+**From the Shapiro-Wilk test, the p-value is less than 0.05, so we reject the null hypothesis that the samples come from normal distribution. Also from the QQ plot, the data is a little bit light tailed. Since the nonnormality is small and a small departure from normality may not break the estimates, we don't need to adjust the model here.**
+
+## Final fitted model and summary
+```{r}
+summary(fit2)
+```
+**fit2 is out final fitted model:** $y = 430.3924 - 19.454*x1 + 5.3552*x2$
+**Summary: there's a multicollinearity between x2 and x3, so I drop x3 from the model. I deleted one influential outlier. Heteroskedacity is not present. There's slight nonnormality and adjustment for it is not necessary here.**
+
+
+2. Use your final model to predict $\hat{Y}$ for the given x-values below. Save your predictions in a vector called `yhat`. (__Note:__ if your values for `yhat` are within a certain threshhold of the true expected values of Y, you will receive extra credit. Good luck!)
+
+```{r}
+x.test.mat <- matrix(c(
+8.88,	 7.56,	3.21,		
+5.20,	 8.50,	6.37,		
+1.13,	 8.62,	11.86,		
+1.57,	 22.66,	18.34,	
+5.75,	 3.65,	5.34,	
+5.19,	 35.76,	33.35,	
+6.85,	 25.71,	19.22,		
+18.27, 43.60,	42.89,		
+18.83, 39.41,	37.85,		
+10.35, 31.76,	27.12	), byrow = TRUE, ncol = 3, nrow = 10)
+colnames(x.test.mat) <- c("x1", "x2", "x3")
+```
+
+```{r}
+x_test <- data.frame(x.test.mat[,1:2])
+(yhat <- predict(fit2, x_test))
+```
+
