@@ -1,0 +1,167 @@
+---
+title: "College Outcomes Analysis"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE, comment = NA, comment="", prompt=FALSE)
+```
+
+`r knitr::opts_chunk$set(cache=TRUE)`  
+
+# I. Introduction  
+With over 7,000 institutions in the United States, students consider many factors when deciding where to attend college. The College Scorecard aims to help students, parents, and counselors make an informed choice on college choice.       
+
+
+# II. Data    
+The College Scorecard data is in multiple csv files from 1996 through 2013, and each csv file includes roughly 7,000 observations (colleges) for 1700 variables. There are many missing entries in the dataset labelled as NA'S and values masked to protect the privacy of individuals in smaller institutions are labelled as "PrivacySuppressed."  
+
+Website: https://collegescorecard.ed.gov/  
+Dataset: https://collegescorecard.ed.gov/data/  
+Documentation: https://collegescorecard.ed.gov/data/documentation/  
+
+
+# III. Reading in the Data in Language-Native Format  
+
+### Load libraries    
+```{r}
+library(tidyverse)
+library(purrr)
+library(data.table)
+```
+
+### Set working directory    
+```{r}
+# double check that this puts you in the right dir
+project.dir <- getwd()
+setwd(project.dir)
+dataset.dir <- "Data"
+outputs.dir <- "Output"
+```
+
+
+
+### Generate a list of files to be read in  
+```{r}
+file_names <- list.files(file.path(project.dir, dataset.dir), pattern="*.csv", full.names=TRUE) 
+```
+
+
+### Create function for reading in filename string  
+We extract the year from the filename. For example: from the filename "MERGED2007_01_PP.csv," we obtained the year from 13 characters from the end of the string.    
+```{r}
+extract_yr_from_fname <- function(fname) {
+  l <- nchar(fname)
+  start <- l-13
+  end <- l-10
+  year <- substr(fname, start, end)
+  return(year)
+}
+file_years <- lapply(file_names, extract_yr_from_fname)
+```
+
+
+### Read in files and combine  
+We use the `fread` function from the `data.table` package to read in a list of files and their corresponding filenames. We coerce missing data values that are "NULL" or empty strings "" into NA's.  
+```{r}
+fname_to_dtable <- function(filename){
+    x <- fread(filename, skip=0, na.strings = c("NULL", ""))
+    
+    # append col called filename to x
+      x <- mutate(x, Year=extract_yr_from_fname(filename))
+      return(x)
+}
+
+```
+
+
+# IV. Assessing the Quality of the Data  
+
+## Measuring completeness of each year
+
+We used a heatmap to visualize missing data in 3 random files. 
+First, we computed a ratio of missing data for every column in the file where a ratio of 1 is a column with all NA's. In the heat map, a column with NA's for every row is represented by the color red.  
+
+```{r}
+data_1996 <- fname_to_dtable(file_names[1])
+
+data2009 <- fname_to_dtable(file_names[13])
+
+data2015 <- fname_to_dtable(file_names[20])
+
+ratio_missing <- function(frame){
+  ratiomissing <- c()
+  for (i in 1:ncol(frame)){
+  
+  ratiomissing[i] <- sum(is.na(frame[,i]))/length(frame[,i])
+  
+  }
+  return(ratiomissing)
+}
+
+ratio_1996 <- (ratio_missing(data_1996))
+ratio_2009 <- (ratio_missing(data2009))
+ratio_2015 <- (ratio_missing(data2015))
+
+B <- matrix(c(ratio_1996,ratio_2009,ratio_2015), nrow=3,ncol=1777)
+B1 <- t(B)
+colnames(B1) <- c("1996","2009","2015")
+dater <- data.matrix(B1)
+collegedata_heatmap <- heatmap(dater, Rowv=NA, Colv=NA, col = heat.colors(256), scale="column", margins=c(5,10))
+```
+
+With the use of this heatmap, we determined that many of the files could be missing large portions of data.
+This heatmap helped us move forward with another tool to summarize the completeness of the data in order to determine which file to use for our analysis. 
+
+We wrote a function that calculates the proportion of columns out of every colummn in the file that satisfies the condition of having at most 20% missing data per column. For example, if a file has 10 columns, and 4 columns have more than 20% missing data, the ratio of good columns over all columns is 6/10.  
+
+```{r}
+calc_perc_goodcols_in_table <- function(dtable){
+    na.max <- .2
+    na.prop <- apply(dtable, 2, function(x) sum(is.na(x)/length(x)))
+    percent_good <- (sum(na.prop < na.max)/length(dtable))
+    return(percent_good)
+}
+
+score_fname_list <- function(fname_list){
+    scores <- c()
+    for (i in 1:length(fname_list)){
+        f <- fname_list[i]
+        tab <- fname_to_dtable(f)
+        score <- calc_perc_goodcols_in_table(tab)
+        cat("\n yr", extract_yr_from_fname(f), "score", score)
+        scores[i] <- score
+  }
+  return(scores)
+}
+
+file_scores <- score_fname_list(fname_list = file_names)
+cat("the best year is", max(file_scores))
+```
+The year 2013 is the best year in terms of % of total columns which have at most 20% NA values.
+
+## Loading 2013 values to table
+```{r}
+d2013 <- fname_to_dtable(file_names[18])
+```
+
+
+## Calculating column-wise NA percent
+```{r}
+filter_NA_cols <- function(dtable){
+    na.max <- .2
+    na.prop <- apply(dtable, 2, function(x) sum(is.na(x)/length(x)))
+    good_cols <- na.prop < na.max
+    return(dtable[,good_cols])
+}
+
+d2013 <- filter_NA_cols(d2013)
+
+(calc_perc_goodcols_in_table(d2013))
+
+```
+
+# V. Analyzing Variables of Interest  
+
+### Analyzing New College vs Other Schools  
+(see relationship.Rmd)  

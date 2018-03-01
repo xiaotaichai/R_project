@@ -1,0 +1,183 @@
+---
+title: "Relationship"
+author: "Xiaotai Chai"
+date: "11/6/2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(data.table)
+library(ggplot2)
+library(tidyverse)
+```
+
+
+# Set working directory  
+```{r}
+# double check that this puts you in the right dir
+project.dir <- getwd()
+setwd(project.dir)
+dataset.dir <- "Data"
+outputs.dir <- "Output"
+```
+
+# Read in cleaned csv file
+```{r}
+# todo replace with fread
+outcomes2013 <- fread("filtered_2013.csv", na.strings=c("<NA>","PrivacySuppressed"))
+#head(outcomes2013)
+```
+
+# Find relationship between completion within 4 years at original institution and Gender of student
+```{r}
+female_complete4yr <- as.numeric(outcomes2013$FEMALE_COMP_ORIG_YR4_RT)
+male_complete4yr <- as.numeric(outcomes2013$MALE_COMP_ORIG_YR4_RT)
+num_completed_by_gender <- na.omit(data.frame(female_complete4yr,male_complete4yr))  # omit rows were either F or M is NA
+
+plot(num_completed_by_gender, xlab="# females graduated", ylab="# males graduated")+title("# of graduates, male vs female")
+
+lm.fit <- lm(female_complete4yr ~ male_complete4yr, data = num_completed_by_gender)
+summary(lm.fit)
+plot(lm.fit)
+
+MEAN <- c(mean(as.numeric(outcomes2013$MALE_COMP_ORIG_YR4_RT),na.rm=TRUE), mean(as.numeric(outcomes2013$FEMALE_COMP_ORIG_YR4_RT),na.rm=TRUE)) 
+
+STD <- c(sd(as.numeric(outcomes2013$MALE_COMP_ORIG_YR4_RT),na.rm=TRUE), sd(as.numeric(outcomes2013$FEMALE_COMP_ORIG_YR4_RT),na.rm=TRUE)) 
+
+MEDIAN <- c(median(as.numeric(outcomes2013$MALE_COMP_ORIG_YR4_RT),na.rm=TRUE), median(as.numeric(outcomes2013$FEMALE_COMP_ORIG_YR4_RT),na.rm=TRUE)) 
+
+mydata <- data.frame(MEAN, STD, MEDIAN)
+row.names(mydata) <- c("male_complete4yr", "female_complete4yr")
+mydata
+```
+```
+
+# Comparing NCF to other colleges
+```{r}
+ncf <- outcomes2013[outcomes2013$INSTNM == "New College of Florida",]
+
+female_percent <- outcomes2013[,c("INSTNM","FEMALE")]
+colnames(female_percent) <- c("School", "Value")
+female_percent <- as.data.frame(mutate(female_percent, Feature="Percnt_female"))
+female_percent$Value <- as.numeric(female_percent$Value)
+female_percent$School[which(female_percent$School != "New College of Florida")] = "Other schools"
+ggplot(female_percent, aes(y=Value, x=Feature, group=School, fill=School)) + geom_boxplot(position=position_dodge(1))
+```
+
+New College is on the lower end of percent female.
+
+```{r}
+percent_recv_loans <- outcomes2013[,c("INSTNM","PCTFLOAN")]
+colnames(percent_recv_loans) <- c("School", "Value")
+percent_recv_loans <- as.data.frame(mutate(percent_recv_loans, Feature="Percnt_reciv_loan"))
+percent_recv_loans$Value <- as.numeric(percent_recv_loans$Value)
+percent_recv_loans$School[which(percent_recv_loans$School != "New College of Florida")] = "Other schools"
+ggplot(percent_recv_loans, aes(y=Value, x=Feature, group=School, fill=School)) + geom_boxplot(position=position_dodge(1))
+```
+
+New College is in the lower tail of recieving loans.
+
+```{r}
+percnt_older_than_25yr <- outcomes2013[,c("INSTNM","UG25ABV")]
+colnames(percnt_older_than_25yr) <- c("School", "Value")
+percnt_older_than_25yr <- as.data.frame(mutate(percnt_older_than_25yr, Feature="Percnt_older_than_25yr"))
+percnt_older_than_25yr$Value <- as.numeric(percnt_older_than_25yr$Value)
+percnt_older_than_25yr$School[which(percnt_older_than_25yr$School != "New College of Florida")] = "Other schools"
+ggplot(percnt_older_than_25yr, aes(y=Value, x=Feature, group=School, fill=School)) + geom_boxplot(position=position_dodge(1))
+```
+
+New College had an insignificant number of >25 year olds.
+
+```{r}
+# avg family income
+Avg_fam_income <- outcomes2013[, c("INSTNM","FAMINC")]
+colnames(Avg_fam_income) <- c("School", "Value")
+Avg_fam_income$Value <- as.numeric(Avg_fam_income$Value)
+Avg_fam_income <- as.data.frame(mutate(Avg_fam_income, Feature="Avg_fam_income"))
+Avg_fam_income$School[which(Avg_fam_income$School != "New College of Florida")] = "Other schools"
+ggplot(Avg_fam_income, aes(y=Value, x=Feature, group=School, fill=School)) + geom_boxplot(position=position_dodge(1))
+```
+
+New College kids come from rich families.
+
+
+```{r}
+mean_income_graduates_after_8yr <- outcomes2013[, c("INSTNM","MN_EARN_WNE_P8")]
+colnames(mean_income_graduates_after_8yr) <- c("School", "Value")
+mean_income_graduates_after_8yr <- as.data.frame(mutate(mean_income_graduates_after_8yr, Feature="Mean_income_graduates_after_8yr"))
+mean_income_graduates_after_8yr$Value <- as.numeric(mean_income_graduates_after_8yr$Value)
+mean_income_graduates_after_8yr$School[which(mean_income_graduates_after_8yr$School != "New College of Florida")] = "Other schools"
+ggplot(mean_income_graduates_after_8yr, aes(y=Value, x=Feature, group=School, fill=School)) + geom_boxplot(position=position_dodge(1))
+```
+
+New College is around the mean income of graduates.
+
+```{r}
+# Share of students earning over $25,000/year (threshold earnings) 8 years after entry
+perc_graduates_earning_grtrthn25k_peryer <- outcomes2013[,c("INSTNM","GT_25K_P8")]
+colnames(perc_graduates_earning_grtrthn25k_peryer) <- c("School", "Value")
+perc_graduates_earning_grtrthn25k_peryer <-  as.data.frame(mutate(perc_graduates_earning_grtrthn25k_peryer, Feature="Perc_graduates_earning_grtrthn25k_peryer"))
+perc_graduates_earning_grtrthn25k_peryer$School[which(perc_graduates_earning_grtrthn25k_peryer$School != "New College of Florida")] = "Other schools"
+perc_graduates_earning_grtrthn25k_peryer$Value <- as.numeric(perc_graduates_earning_grtrthn25k_peryer$Value)
+ggplot(perc_graduates_earning_grtrthn25k_peryer, aes(y=Value, x=Feature, group=School, fill=School)) + geom_boxplot(position=position_dodge(1))
+```
+
+NCF graduates make a little less than averge than other graduates.
+
+```{r}
+# instructional expenditures
+institutional_expenditures <- outcomes2013[,c("INSTNM","INEXPFTE")]
+colnames(institutional_expenditures) <- c("School", "Value")
+institutional_expenditures <-  as.data.frame(mutate(institutional_expenditures, Feature="institutional_expenditures"))
+institutional_expenditures$School[which(institutional_expenditures$School != "New College of Florida")] = "Other schools"
+institutional_expenditures$Value <- as.numeric(institutional_expenditures$Value)
+ggplot(institutional_expenditures, aes(y=Value, x=Feature, group=School, fill=School)) + geom_boxplot(position=position_dodge(1))
+```
+
+New College is in the lower tail of institutional expenditure spendings
+
+
+```{r}
+# Net tuition revenue per full-time equivalent student
+tuition_in_state <- outcomes2013[,c("INSTNM","TUITFTE")]
+colnames(tuition_in_state) <- c("School", "Value")
+tuition_in_state <-  as.data.frame(mutate(tuition_in_state, Feature="tuition_in_state"))
+tuition_in_state$Value <- as.numeric(tuition_in_state$Value)
+tuition_in_state$School[which(tuition_in_state$School != "New College of Florida")] = "Other schools"
+ggplot(tuition_in_state, aes(y=Value, x=Feature, group=School, fill=School)) + geom_boxplot(position=position_dodge(1))
+```
+About average.
+
+
+```{r}
+# The median original amount of the loan principal upon entering repayment
+loan_principal <- outcomes2013[,c("INSTNM","DEBT_MDN")]
+colnames(loan_principal) <- c("School", "Value")
+loan_principal <-  as.data.frame(mutate(loan_principal, Feature="loan_principal"))
+loan_principal$Value <- as.numeric(loan_principal$Value)
+loan_principal$School[which(loan_principal$School != "New College of Florida")] = "Other schools"
+ggplot(loan_principal, aes(y=Value, x=Feature, group=School, fill=School)) + geom_boxplot(position=position_dodge(1))
+```
+
+Way lower loan principal!
+
+
+
+```{r}
+# 3 yr cohort default rate
+default_rate <- outcomes2013[,c("INSTNM","CDR3")]
+colnames(default_rate) <- c("School", "Value")
+default_rate <-  as.data.frame(mutate(default_rate, Feature="default_rate"))
+default_rate$Value <- as.numeric(default_rate$Value)
+default_rate$School[which(default_rate$School != "New College of Florida")] = "Other schools"
+ggplot(default_rate, aes(y=Value, x=Feature, group=School, fill=School)) + geom_boxplot(position=position_dodge(1))
+```
+
+I thought we'd have higher because we're communist hippies, but we are in the lower tail
+
