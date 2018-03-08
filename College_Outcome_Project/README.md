@@ -10,16 +10,16 @@ Data are available in yearly reports from 1996 through 2013, and each includes r
 
 
 # Goals:
-1. **Read the data into a language-native format. Properly treating NAs and other encoded variables.**
+1. **Read the data into a language-native format. Properly treating NAs and other encoded variables.**  
 
-2. **Assess the quality of the data.** This may include:
- a. Measuring fraction of missing values, or relationships among missing values and other columns
- b. Calculating numeric quality scores for several metrics
+2. **Assess the quality of the data.** This may include:  
+ a. Measuring fraction of missing values, or relationships among missing values and other columns.  
+ b. Calculating numeric quality scores for several metrics.  
 
-3. **Recode any variables of interest.** For example:
- a. Create combined categories from several columns
- b. Aggregate summary statistics from factor levels in several columns
- c. Normalize data between categories, where appropriate
+3. **Recode any variables of interest.** For example:  
+ a. Create combined categories from several columns.  
+ b. Aggregate summary statistics from factor levels in several columns.  
+ c. Normalize data between categories, where appropriate.  
 
 4. **Identify and display any relationships of interest.**
 
