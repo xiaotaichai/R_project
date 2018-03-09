@@ -2,6 +2,116 @@
 title: "Data Visualization with ggplot2"
 author: "Xiaotai Chai"
 date: "2/28/2018"
-output: html_document
+output: github_document
 ---
+
+You can put **fig.show = "animate"** for chunk option to run within knitr.
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, fig.show = "animate")
+```
+
+# Install packages
+```{r}
+#devtools::install_github("dgrtwo/gganimate")
+#devtools::install_github("yihui/animation")
+#install.packages('animation')
+#install.packages("imager")
+library(ggplot2)
+library(animation)
+library(gganimate)
+library(reshape2)
+```
+
+# Read in the data and EDA
+```{r}
+FL_data <- read.csv("2017FL_performance.csv")
+FL_data$AIRLINE_ID <- factor(FL_data$AIRLINE_ID)
+
+
+FL_dep <- FL_data[grep("FL", FL_data$ORIGIN_CITY_NAME), ] # flights depart from FL
+FL_arr <- FL_data[grep("FL", FL_data$DEST_CITY_NAME), ] # flights arrive in FL
+
+# add a column to denote flights depart from or arrive in FL
+FL_arr$fromFL <- "arriveFL" 
+FL_dep$fromFL <- "departFL"
+
+# add a column "delay" and use ARR_DELAY for flights arrive in FL and DEP_DELAY for flights depart from FL
+FL_arr$delay <- FL_arr$ARR_DELAY
+FL_dep$delay <- FL_dep$DEP_DELAY
+
+# combine the two data frames with fromFL column (flights that both depart from FL and arrive in FL are counted twice)
+newFL_data <- rbind(FL_arr, FL_dep) 
+
+# extract the columns that we will use
+newFL_data <- newFL_data[,c("DAY_OF_MONTH","AIRLINE_ID","fromFL","delay")]
+
+# find mean of delay group by AIRLINE_ID, DAY_OF_MONTH, and fromFL
+newFL_data_mean <- aggregate(delay ~ AIRLINE_ID + DAY_OF_MONTH + fromFL, newFL_data, mean)
+
+# mean of ARR_DELAY or DEP_DELAY group by AIRLINE_ID and DAY_OF_MONTH
+FL_arr_mean <- aggregate(ARR_DELAY ~ DAY_OF_MONTH + AIRLINE_ID, FL_arr, mean)
+FL_dep_mean <- aggregate(DEP_DELAY ~ AIRLINE_ID + DAY_OF_MONTH, FL_dep, mean)
+
+```
+
+# Compare arrive delay and departure delay for each airline
+
+First, we plot the change of ARR_DELAY for each airline in terms of DAY_OF_MONTH. (Surprisingly, gganimate wouldn't plot with geom_path when I use FL_arr_mean dataframe which has the mean of ARR_DELAY for each airline for each day. It seems gganimate automatically chooses the maximum delay for each airline each day.)
+```{r}
+theme_set(theme_bw())
+arr_plot <- ggplot(FL_arr, aes(AIRLINE_ID, ARR_DELAY, size = ARR_DELAY, color = AIRLINE_ID, frame = DAY_OF_MONTH)) +
+  geom_path(aes(cumulative = FALSE, group = AIRLINE_ID))
+
+gganimate(arr_plot)
+```
+
+Here we plot the change of DEP_DELAY for each airline in terms of DAY_OF_MONTH (Same as above, I used unaggregated data for geom_path).
+```{r}
+dep_plot <- ggplot(FL_dep, aes(AIRLINE_ID, DEP_DELAY, size = DEP_DELAY, color = AIRLINE_ID, frame = DAY_OF_MONTH)) +
+  geom_path(aes(cumulative = FALSE, group = AIRLINE_ID))
+ 
+gganimate(dep_plot)
+```
+
+Now we put mean ARR_DELAY and mean DEP_DELAY for each airline together so we can compare them. From this plot we can tell if the mean ARR_DELAY and mean DEP_DELAY for each airline go together. For example, on Day 2, 6, and 7, both mean ARR_DELAY and mean DEP_DELAY for most airlines are positive, which may imply there was an bad weather during those days making all flights delayed.
+```{r}
+delay_plot <-ggplot(newFL_data_mean, aes(AIRLINE_ID, delay, frame=DAY_OF_MONTH)) +   
+  geom_bar(aes(fill = fromFL), position = "dodge", stat="identity")
+
+gganimate(delay_plot)
+```
+
+# Barplot
+We used geom_path for arr_plot and dep_plot. We can also try the barplot. 
+```{r}
+arr_bar <- ggplot(FL_arr, aes(AIRLINE_ID,ARR_DELAY,color = AIRLINE_ID, frame = DAY_OF_MONTH))+
+  geom_bar(stat="identity")
+
+gganimate(arr_bar)
+```
+
+Mean of ARR_DELAY for each airline.
+```{r}
+arr_bar_mean <- ggplot(FL_arr_mean, aes(AIRLINE_ID,ARR_DELAY,color = AIRLINE_ID, frame = DAY_OF_MONTH))+
+  geom_bar(stat="identity")
+
+gganimate(arr_bar_mean)
+```
+
+Barplot of DEP_DELAY for each airline.
+```{r}
+dep_bar <- ggplot(FL_dep, aes(AIRLINE_ID,DEP_DELAY,color = AIRLINE_ID, frame = DAY_OF_MONTH))+
+  geom_bar(stat="identity")
+
+gganimate(dep_bar)
+```
+
+Mean of DEP_DELAY for each airline.
+```{r}
+dep_bar_mean <- ggplot(FL_dep_mean, aes(AIRLINE_ID,DEP_DELAY,color = AIRLINE_ID, frame = DAY_OF_MONTH))+
+  geom_bar(stat="identity")
+
+gganimate(dep_bar_mean)
+```
+
 
